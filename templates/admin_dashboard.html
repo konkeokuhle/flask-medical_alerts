@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<h2>👨‍💼 Admin Dashboard</h2>
+<p>Welcome, {{ admin.name }} ({{ admin.email }})</p>
+
+<div class="grid-container">
+    <!-- LEFT COLUMN -->
+    <div class="grid-item">
+        <!-- Appointment Slots -->
+        <div class="card">
+            <h3>📅 Manage Appointment Slots</h3>
+            <form id="slotForm" class="form">
+                <label>Department</label>
+                <select id="slotDept" required>
+                    <option value="">-- Select Department --</option>
+                    <option value="Counseling">Counseling</option>
+                    <option value="Clinic">Clinic</option>
+                </select>
+                <label>Start Time</label>
+                <input type="datetime-local" id="slotStart" required>
+                <label>End Time</label>
+                <input type="datetime-local" id="slotEnd" required>
+                <button type="submit" class="btn btn-primary">Add Slot</button>
+            </form>
+            <button id="toggleSlots" class="btn btn-info small-btn mt-2">Show Slots</button>
+            <div id="slotsContainer" style="display:none; animation: fadeIn 0.5s;"></div>
+        </div>
+
+        <!-- Analytics -->
+        <div class="card">
+            <h3>📊 Reports Analytics</h3>
+            <div style="height:250px"><canvas id="reportsChart"></canvas></div>
+            <h3 class="mt-4">🏫 Students per Department</h3>
+            <div style="height:250px"><canvas id="departmentsChart"></canvas></div>
+            <h3 class="mt-4">📈 Slot Booking Trends</h3>
+            <div style="height:250px"><canvas id="slotsTrendChart"></canvas></div>
+        </div>
+
+        <!-- Emergency Map -->
+        <div class="card">
+            <h3>🗺️ Emergency Reports Map</h3>
+            <div id="reportsMap" style="height:300px; width:100%;"></div>
+        </div>
+
+        <!-- Emergency Alerts Sender -->
+        <div class="card">
+            <h3>🚨 Send Emergency Alert</h3>
+            <form id="alertForm">
+                <input type="text" id="alertTitle" class="form-control mb-2" placeholder="Alert Title" required>
+                <textarea id="alertBody" class="form-control mb-2" placeholder="Alert Message" required></textarea>
+                <button type="submit" class="btn btn-danger">Send Alert</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="grid-item">
+        <!-- Student Reports -->
+        <div class="card">
+            <h3>📋 Student Reports</h3>
+            <button id="toggleReports" class="btn btn-info small-btn mb-2">Hide Reports</button>
+            <div id="reportsList">Loading reports...</div>
+        </div>
+
+        <!-- Emergency Alerts -->
+        <div class="card">
+            <h3>🚨 Emergency Alerts Feed</h3>
+            <button id="toggleAlerts" class="btn btn-info small-btn mb-2">Hide Alerts</button>
+            <div id="alertsFeed">Loading alerts...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card { margin-bottom: 1rem; }
+.reply-box { margin-top: 0.5rem; }
+.report-entry { border-bottom:1px solid #eee; padding:8px 0;}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- ✅ Leaflet CSS & JS (instead of Google Maps) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+function safeJSON(res){ return res.json().catch(()=>({})); }
+let reportsChart, departmentsChart, slotsTrendChart;
+function destroyChart(chart){ if(chart){ chart.destroy(); } }
+
+// ================== Appointment Slots ==================
+async function loadSlots(){
+    const res = await fetch('/api/slots');
+    const list = await safeJSON(res);
+    const container = document.getElementById('slotsContainer');
+    container.innerHTML = '';
+    if(!Array.isArray(list) || list.length===0){
+        container.textContent = "No slots created.";
+        return;
+    }
+    list.forEach(s=>{
+        const div = document.createElement('div');
+        div.className = 'p-2 border rounded mb-2 report-entry';
+        div.innerHTML = `<b>${s.department}</b> | ${s.start} - ${s.end} 
+            <br>Status: ${s.booked_by ? "Booked by " + (s.student_name || s.student_email || s.booked_by) : "Free"}`;
+        container.appendChild(div);
+    });
+}
+document.getElementById('toggleSlots').addEventListener('click', ()=>{
+    const c = document.getElementById('slotsContainer');
+    if(c.style.display === 'none'){ c.style.display = 'block'; loadSlots(); }
+    else c.style.display = 'none';
+});
+document.getElementById('slotForm').addEventListener('submit', async(e)=>{
+    e.preventDefault();
+    const data = {
+        department: document.getElementById('slotDept').value,
+        start: document.getElementById('slotStart').value,
+        end: document.getElementById('slotEnd').value
+    };
+    const res = await fetch('/api/slots', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+    });
+    const j = await safeJSON(res);
+    alert(j.ok ? "✅ Slot added" : "❌ Failed: " + (j.error||""));
+    loadSlots();
+});
+
+// ================== Reports Analytics ==================
+async function loadAnalytics(){
+    const res = await fetch('/api/reports');
+    const list = await safeJSON(res);
+
+    const categories = ["Medical Emergency", "Mental Health Concern", "Violence / Safety", "Fire / Accident", "Other", "SOS"];
+    const counts = {}; categories.forEach(c => counts[c] = 0);
+
+    if(Array.isArray(list)){
+        list.forEach(r=>{
+            const t = r.title || "Other";
+            if(categories.includes(t)) counts[t]++;
+            else counts["Other"]++;
+        });
+    }
+
+    destroyChart(reportsChart);
+    reportsChart = new Chart(document.getElementById('reportsChart'), {
+        type: 'bar',
+        data: { labels: categories,
+            datasets: [{ label: '# of Reports', data: categories.map(c => counts[c]),
+            backgroundColor: 'rgba(54, 162, 235, 0.7)' }] },
+        options: { responsive:true, maintainAspectRatio:false }
+    });
+
+    const sres = await fetch('/api/students');
+    const students = await safeJSON(sres);
+    const departments = ["Counseling","Clinic"];
+    const dcounts = {}; departments.forEach(d => dcounts[d]=0);
+    if(Array.isArray(students)){
+        students.forEach(st=>{
+            const dept = st.department || "Other";
+            if(dept==="Counseling" || dept==="Counseling Department") dcounts["Counseling"]++;
+            else if(dept==="Clinic" || dept==="Clinic Department") dcounts["Clinic"]++;
+        });
+    }
+    destroyChart(departmentsChart);
+    departmentsChart = new Chart(document.getElementById('departmentsChart'), {
+        type:'bar',
+        data:{ labels: ["Counseling","Clinic"], datasets:[{ label:'# of Students', data: [dcounts["Counseling"], dcounts["Clinic"]] }]},
+        options:{ responsive:true, maintainAspectRatio:false }
+    });
+
+    const ares = await fetch('/api/analytics');
+    const analytics = await safeJSON(ares);
+    const trends = analytics.slot_trends || {};
+    const labels = [...new Set(Object.values(trends).flatMap(obj => Object.keys(obj)))].sort();
+    const datasets = Object.keys(trends).map(dep=>({
+        label: dep + " Bookings",
+        data: labels.map(d => trends[dep][d] || 0),
+        borderColor: '#'+Math.floor(Math.random()*16777215).toString(16),
+        fill:false, tension:0.2
+    }));
+    destroyChart(slotsTrendChart);
+    slotsTrendChart = new Chart(document.getElementById('slotsTrendChart'), {
+        type:'line',
+        data:{ labels, datasets },
+        options:{ responsive:true, maintainAspectRatio:false }
+    });
+}
+loadAnalytics();
+
+// ================== Reports list & reply UI ==================
+async function loadReportsList(){
+    const res = await fetch('/api/reports');
+    const list = await safeJSON(res);
+    const container = document.getElementById('reportsList');
+    container.innerHTML = '';
+    if(!Array.isArray(list) || list.length===0){
+        container.textContent = "No reports.";
+        return;
+    }
+    list.forEach(r=>{
+        const div = document.createElement('div');
+        div.className = 'p-2 border rounded mb-2 report-entry';
+        div.innerHTML = `<b>${r.title}</b> <small>${r.status||'Pending'}</small><br>
+            ${r.body ? r.body + '<br>' : '' }
+            <small>By: ${r.reporter_name || r.reporter_email} at ${r.created_at}</small>
+            <div class="mt-2"></div>
+            `;
+
+        const repliesContainer = document.createElement('div');
+        if(Array.isArray(r.replies) && r.replies.length){
+            r.replies.forEach(rep=>{
+                repliesContainer.innerHTML += `<div style="margin-top:6px; padding:6px; background:#f8f9fa;">${rep.text}<br><small>By ${rep.admin_name} at ${rep.created_at}</small></div>`;
+            });
+        }
+
+        const replyBox = document.createElement('div');
+        replyBox.innerHTML = `<textarea placeholder="Write reply..." rows="2" style="width:100%;"></textarea>
+            <button class="btn btn-sm btn-success mt-1">Send Reply</button>`;
+        const textarea = replyBox.querySelector('textarea');
+        const btn = replyBox.querySelector('button');
+        btn.addEventListener('click', async ()=>{
+            const txt = textarea.value.trim();
+            if(!txt){ alert('Reply text required'); return; }
+            const res = await fetch('/api/reports/' + r.id + '/reply', {
+                method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: txt })
+            });
+            const j = await safeJSON(res);
+            if(j.ok){ alert('Reply sent'); loadReportsList(); loadAnalytics(); loadReportMap(); }
+            else alert('Failed: ' + (j.error || JSON.stringify(j)));
+        });
+
+        div.appendChild(repliesContainer);
+        div.appendChild(replyBox);
+        container.appendChild(div);
+    });
+}
+loadReportsList();
+
+document.getElementById('toggleReports').addEventListener('click', ()=>{
+    const c = document.getElementById('reportsList');
+    if(c.style.display === 'none'){ c.style.display = 'block'; document.getElementById('toggleReports').innerText = "Hide Reports"; loadReportsList(); }
+    else { c.style.display = 'none'; document.getElementById('toggleReports').innerText = "Show Reports"; }
+});
+
+// ================== Alerts feed ==================
+async function loadAlerts(){
+    const res = await fetch('/api/alerts');
+    const list = await safeJSON(res);
+    const container = document.getElementById('alertsFeed');
+    container.innerHTML = '';
+    if(!Array.isArray(list) || list.length===0){
+        container.textContent = "No alerts yet.";
+        return;
+    }
+    list.forEach(a=>{
+        const div = document.createElement('div');
+        div.className = 'p-2 border rounded mb-2';
+        div.innerHTML = `<b>${a.title}</b><br>${a.body}<br><small>${a.created_at}</small>`;
+        container.appendChild(div);
+    });
+}
+document.getElementById('toggleAlerts').addEventListener('click', ()=>{
+    const c = document.getElementById('alertsFeed');
+    if(c.style.display === 'none'){ c.style.display = 'block'; document.getElementById('toggleAlerts').innerText = "Hide Alerts Feed"; loadAlerts(); }
+    else { c.style.display = 'none'; document.getElementById('toggleAlerts').innerText = "Show Alerts Feed"; }
+});
+
+document.getElementById('alertForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const title = document.getElementById('alertTitle').value;
+    const body = document.getElementById('alertBody').value;
+    const res = await fetch('/api/alerts', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title, body })
+    });
+    const j = await safeJSON(res);
+    alert(j.ok ? `Sent (${j.success} success)` : 'Failed');
+    document.getElementById('alertTitle').value = '';
+    document.getElementById('alertBody').value = '';
+    loadAlerts();
+});
+
+// ================== ✅ Leaflet Emergency Reports ==================
+let map;
+let markers = [];
+
+async function loadReportMap(){
+    const res = await fetch('/api/reports');
+    const reports = await res.json();
+
+    if(!map){
+        map = L.map('reportsMap').setView([-29.8587, 31.0218], 12); // Durban
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+    }
+
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    reports.forEach(r=>{
+        if(r.location && r.location.lat && r.location.lng){
+            const marker = L.marker([r.location.lat, r.location.lng])
+                .addTo(map)
+                .bindPopup(`
+                    <b>${r.title}</b><br>
+                    ${r.body || ''}<br>
+                    <small>By ${r.reporter_name || r.reporter_email}</small><br>
+                    <small>Status: ${r.status}</small>
+                `);
+            markers.push(marker);
+        }
+    });
+
+    if(markers.length){
+        const group = new L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.2));
+    }
+}
+loadReportMap();
+</script>
+{% endblock %}

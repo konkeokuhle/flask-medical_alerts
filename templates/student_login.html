@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Student Login{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <h2 class="auth-title">🎓 Student Login</h2>
+        <form method="POST" class="auth-form">
+            <div class="form-group">
+                <label for="email" class="form-label">Email Address</label>
+                <input type="email" class="form-control" name="email" required placeholder="Enter your email">
+            </div>
+
+            <div class="form-group password-group">
+                <label for="password" class="form-label">Password</label>
+                <div class="password-wrapper">
+                    <input type="password" class="form-control" name="password" id="passwordField" required placeholder="Enter your password">
+                    <span class="toggle-password" onclick="togglePassword()">👁</span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Login</button>
+            <div class="auth-links">
+                <a href="{{ url_for('student_signup') }}" class="link">Don’t have an account? Signup</a>
+                <a href="{{ url_for('get_started') }}" class="link">⬅ Back to Get Started</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function togglePassword() {
+    const field = document.getElementById("passwordField");
+    const icon = document.querySelector(".toggle-password");
+    if (field.type === "password") {
+        field.type = "text";
+        icon.textContent = "🙈";
+    } else {
+        field.type = "password";
+        icon.textContent = "👁";
+    }
+}
+</script>
+{% endblock %}

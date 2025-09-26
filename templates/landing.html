@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Welcome | Emergency Alerts App{% endblock %}
+
+{% block content %}
+<div class="landing-container">
+    <!-- Slideshow -->
+    <div class="carousel">
+        <img src="{{ url_for('static', filename='images/slide1.png') }}" class="carousel-image active">
+        <img src="{{ url_for('static', filename='images/slide2.png') }}" class="carousel-image">
+        <img src="{{ url_for('static', filename='images/slide3.png') }}" class="carousel-image">
+    </div>
+
+    <!-- Overlay Text -->
+    <div class="landing-text text-center text-white">
+        <h1 class="fw-bold">Welcome to <span style="color:#8CC4DF">Emergency Alerts App</span></h1>
+        <p class="lead">
+            A real-time emergency alert and notification system for universities,<br>
+            keeping students and administrators safe and informed.
+        </p>
+        <a href="{{ url_for('get_started') }}" class="btn btn-primary btn-lg mt-3">🚀 Get Started</a>
+    </div>
+</div>
+
+<style>
+/* Fullscreen container */
+.landing-container {
+    position: relative;
+    height: 90vh; /* 90% of screen */
+    overflow: hidden;
+}
+
+/* Slideshow images */
+.carousel {
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+.carousel-image {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+}
+.carousel-image.active {
+    opacity: 1;
+}
+
+/* Overlay text */
+.landing-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    max-width: 80%;
+    background: rgba(18,37,67,0.7); /* dark overlay for readability */
+    padding: 2rem;
+    border-radius: 12px;
+}
+</style>
+
+<script>
+let currentIndex = 0;
+const slides = document.querySelectorAll('.carousel-image');
+
+function showNextSlide() {
+    slides[currentIndex].classList.remove('active');
+    currentIndex = (currentIndex + 1) % slides.length;
+    slides[currentIndex].classList.add('active');
+}
+
+// Change slide every 2 seconds
+setInterval(showNextSlide, 2000);
+</script>
+{% endblock %}

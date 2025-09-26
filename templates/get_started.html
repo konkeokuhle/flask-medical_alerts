@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Get Started{% endblock %}
+
+{% block content %}
+<div class="get-started-container">
+    <h2 class="page-title">🚀 Get Started</h2>
+    <p class="subtitle">Please choose your role to continue:</p>
+
+    <div class="role-grid">
+        <!-- Student Section -->
+        <div class="role-card student-card">
+            <h3>🎓 Student</h3>
+            <p>Access your dashboard, submit reports, and track responses.</p>
+            <div class="btn-group">
+                <a href="{{ url_for('student_login') }}" class="btn btn-primary">Login</a>
+                <a href="{{ url_for('student_signup') }}" class="btn btn-accent">Sign Up</a>
+            </div>
+        </div>
+
+        <!-- Admin Section -->
+        <div class="role-card admin-card">
+            <h3>👩‍💼 Admin</h3>
+            <p>Manage reports, send alerts, and monitor student well-being.</p>
+            <div class="btn-group">
+                <a href="{{ url_for('admin_login') }}" class="btn btn-secondary">Login</a>
+                <a href="{{ url_for('admin_signup') }}" class="btn btn-accent">Sign Up</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

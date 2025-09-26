@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}Student Dashboard{% endblock %}
+
+{% block content %}
+<h2>🎓 Student Dashboard</h2>
+<p>Welcome, {{ student.name }} ({{ student.email }})</p>
+
+<div class="grid-container">
+    <!-- LEFT COLUMN -->
+    <div class="grid-item">
+        <!-- Emergency Reports -->
+        <div class="card">
+            <h3>🚨 Emergency Reports</h3>
+            <button id="sosBtn" class="btn btn-danger">Send SOS</button>
+            <form id="reportForm" class="form mt-2">
+                <label>Category</label>
+                <select id="reportTitle" required>
+                    <option value="">-- Select a category --</option>
+                    <option value="Medical Emergency">Medical Emergency</option>
+                    <option value="Mental Health Concern">Mental Health Concern</option>
+                    <option value="Violence / Safety">Violence / Safety</option>
+                    <option value="Fire / Accident">Fire / Accident</option>
+                    <option value="Other">Other</option>
+                </select>
+                <label>Description</label>
+                <textarea id="reportBody" required></textarea>
+                <button type="submit" class="btn btn-primary">Send Report</button>
+            </form>
+            <div id="reportResult"></div>
+        </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="grid-item">
+        <!-- Alerts -->
+        <div class="card">
+            <h3>
+                📢 Alerts Feed 
+                <button id="toggleAlerts" class="btn btn-info small-btn">Show Alerts Feed</button>
+            </h3>
+            <div id="alertsFeed" style="display:none;">Loading alerts...</div>
+        </div>
+
+        <!-- Appointments -->
+        <div class="card">
+            <h3>
+                📅 Book Appointment 
+                <button id="toggleSlots" class="btn btn-info small-btn">Show Slots</button>
+            </h3>
+            <div id="slotsContainer" style="display:none; animation: fadeIn 0.5s;">
+                <h5>Clinic Slots</h5>
+                <div id="clinicSlots">Loading...</div>
+                <h5>Counseling Slots</h5>
+                <div id="counselingSlots">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Report Status -->
+        <div class="card">
+            <h3>
+                📋 My Report Status 
+                <button id="toggleStatus" class="btn btn-info small-btn">Show Reports Status</button>
+            </h3>
+            <div id="statusUpdates" style="display:none;">Loading status...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
+.card { margin-bottom: 1rem; }
+.status-entry { border-bottom: 1px solid #ddd; padding: 5px 0; }
+.status-reply { margin-left: 15px; color: #555; font-style: italic; }
+.toggle-replies { margin-top:5px; cursor:pointer; color:#007bff; }
+</style>
+
+<script>
+function safeJSON(res){ return res.json().catch(()=>({})); }
+
+// ================== Geolocation ==================
+async function getLocation() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+            pos => resolve({
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude
+            }),
+            err => resolve(null),
+            { enableHighAccuracy: true }
+        );
+    });
+}
+
+// ================== Alerts Feed ==================
+async function loadAlerts(){
+    const res = await fetch('/api/alerts');
+    const list = await safeJSON(res);
+    const container = document.getElementById('alertsFeed');
+    container.innerHTML = '';
+    if(!Array.isArray(list) || list.length===0){
+        container.textContent = "No alerts yet.";
+        return;
+    }
+    list.forEach(a=>{
+        const div = document.createElement('div');
+        div.className = 'alert alert-warning mb-2';
+        div.innerHTML = `<b>${a.title}</b><br>${a.body}<br><small>${a.created_at}</small>`;
+        container.appendChild(div);
+    });
+}
+document.getElementById('toggleAlerts').addEventListener('click', ()=>{
+    const c = document.getElementById('alertsFeed');
+    if(c.style.display === 'none'){
+        c.style.display = 'block';
+        document.getElementById('toggleAlerts').innerText = "Hide Alerts Feed";
+        loadAlerts();
+    } else {
+        c.style.display = 'none';
+        document.getElementById('toggleAlerts').innerText = "Show Alerts Feed";
+    }
+});
+
+// ================== Appointment Slots ==================
+async function loadSlots(){
+    const res = await fetch('/api/slots');
+    const list = await safeJSON(res);
+    const clinicC = document.getElementById('clinicSlots');
+    const counselC = document.getElementById('counselingSlots');
+    clinicC.innerHTML = '';
+    counselC.innerHTML = '';
+    if(!Array.isArray(list) || list.length===0){
+        clinicC.textContent = "No slots.";
+        counselC.textContent = "No slots.";
+        return;
+    }
+    list.forEach(s=>{
+        const div = document.createElement('div');
+        div.className = 'p-2 border rounded mb-2';
+        if(!s.booked_by){
+            div.innerHTML = `<b>Start:</b> ${s.start}<br><b>End:</b> ${s.end}<br>
+                <button class="btn btn-sm btn-success" onclick="bookSlot('${s.id}')">Book</button>`;
+        } else {
+            div.innerHTML = `<b>Start:</b> ${s.start}<br><b>End:</b> ${s.end}<br><small>Booked</small>`;
+        }
+        if(s.department === "Clinic") clinicC.appendChild(div);
+        else if(s.department === "Counseling") counselC.appendChild(div);
+    });
+}
+async function bookSlot(id){
+    const res = await fetch(`/api/slots/${id}/book`, {method:'POST'});
+    const j = await safeJSON(res);
+    alert(j.ok ? "✅ Slot booked" : "❌ Failed");
+    loadSlots();
+}
+document.getElementById('toggleSlots').addEventListener('click', ()=>{
+    const c = document.getElementById('slotsContainer');
+    if(c.style.display === 'none'){ c.style.display = 'block'; loadSlots(); }
+    else c.style.display = 'none';
+});
+
+// ================== Report Status ==================
+async function loadStatus(){
+    const res = await fetch('/api/reports');
+    const list = await safeJSON(res);
+    const container = document.getElementById('statusUpdates');
+    container.innerHTML = '';
+    if(!Array.isArray(list) || list.length===0){
+        container.textContent = "No reports submitted.";
+        return;
+    }
+    list.forEach(r=>{
+        const div = document.createElement('div');
+        div.className = 'border rounded p-2 mb-2';
+        div.innerHTML = `
+            <div class="status-entry">
+                <b>Category:</b> ${r.title}<br>
+                <b>Status:</b> ${r.status || 'Pending'}<br>
+                <small>Reported at: ${r.created_at}</small>
+            </div>
+        `;
+        if(r.replies && Array.isArray(r.replies) && r.replies.length > 0){
+            const toggleBtn = document.createElement('div');
+            toggleBtn.className = "toggle-replies";
+            toggleBtn.textContent = "Show Replies";
+            const repliesDiv = document.createElement('div');
+            repliesDiv.style.display = "none";
+            r.replies.forEach(rep=>{
+                repliesDiv.innerHTML += `<div class="status-reply">🔔 ${rep.text} <br>
+                                          <small>${rep.created_at}</small></div>`;
+            });
+            toggleBtn.onclick = ()=>{
+                if(repliesDiv.style.display === "none"){
+                    repliesDiv.style.display = "block";
+                    toggleBtn.textContent = "Hide Replies";
+                } else {
+                    repliesDiv.style.display = "none";
+                    toggleBtn.textContent = "Show Replies";
+                }
+            };
+            div.appendChild(toggleBtn);
+            div.appendChild(repliesDiv);
+        }
+        container.appendChild(div);
+    });
+}
+document.getElementById('toggleStatus').addEventListener('click', ()=>{
+    const c = document.getElementById('statusUpdates');
+    if(c.style.display === 'none'){
+        c.style.display = 'block';
+        document.getElementById('toggleStatus').innerText = "Hide Reports Status";
+        loadStatus();
+    } else {
+        c.style.display = 'none';
+        document.getElementById('toggleStatus').innerText = "Show Reports Status";
+    }
+});
+
+// ================== SOS Button (with location) ==================
+document.getElementById('sosBtn').addEventListener('click', async ()=>{
+    const location = await getLocation();
+    const res = await fetch('/api/reports', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ 
+            title:'SOS', 
+            body:'Immediate assistance required', 
+            location: location || null,
+            location_text: location ? `Lat: ${location.lat}, Lng: ${location.lng}` : "Unknown"
+        })
+    });
+    const j = await safeJSON(res);
+    alert(j.ok ? "🚨 SOS Sent!" : "❌ Failed");
+});
+
+// ================== Submit Custom Report (with location) ==================
+document.getElementById('reportForm').addEventListener('submit', async(e)=>{
+    e.preventDefault();
+    const title = document.getElementById('reportTitle').value;
+    const body = document.getElementById('reportBody').value;
+    const location = await getLocation();
+    const res = await fetch('/api/reports', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ 
+            title, body,
+            location: location || null,
+            location_text: location ? `Lat: ${location.lat}, Lng: ${location.lng}` : "Unknown"
+        })
+    });
+    const j = await safeJSON(res);
+    document.getElementById('reportResult').innerText = j.ok ? "✅ Report sent" : "❌ Failed";
+    e.target.reset();
+});
+
+// initial loads
+// load alerts and ensure slots/status hidden until toggled
+</script>
+{% endblock %}

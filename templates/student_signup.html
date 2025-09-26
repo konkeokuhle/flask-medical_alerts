@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Student Signup{% endblock %}
+
+{% block content %}
+<div class="card shadow p-4">
+    <h2 class="mb-4">Student Signup</h2>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="name" class="form-label">Full Name</label>
+            <input type="text" class="form-control" name="name" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="email" class="form-label">Email Address</label>
+            <input type="email" class="form-control" name="email" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" class="form-control" name="password" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="department" class="form-label">Faculty / Department</label>
+            <select class="form-control" name="department" required>
+                <option value="" disabled selected>Select Faculty</option>
+                <option value="Accounting and Informatics">Accounting and Informatics</option>
+                <option value="Applied Sciences">Applied Sciences</option>
+                <option value="Arts and Design">Arts and Design</option>
+                <option value="Engineering and the Built Environment">Engineering and the Built Environment</option>
+                <option value="Health Sciences">Health Sciences</option>
+                <option value="Management Sciences">Management Sciences</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="phone" class="form-label">Phone Number</label>
+            <input type="text" class="form-control" name="phone" placeholder="+27..." required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Signup</button>
+        <a href="{{ url_for('student_login') }}" class="btn btn-link">Already have an account? Login</a>
+    </form>
+</div>
+{% endblock %}
